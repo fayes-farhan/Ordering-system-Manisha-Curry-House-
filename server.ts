@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
@@ -128,8 +127,53 @@ async function seedDatabaseIfEmpty() {
 // --------------------------------------------------------
 
 // Healthcheck endpoint
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", supabaseConfigured: !!supabaseClient });
+app.get("/api/health", async (req, res) => {
+  const diagnostics: any = {
+    status: "ok",
+    supabaseConfigured: !!supabaseClient,
+    envUrl: process.env.VITE_SUPABASE_URL ? "defined" : "undefined",
+    envKey: process.env.VITE_SUPABASE_ANON_KEY ? "defined" : "undefined",
+    tables: {
+      menu_items: { exists: false, error: null },
+      orders: { exists: false, error: null },
+      order_items: { exists: false, error: null }
+    }
+  };
+
+  if (!supabaseClient) {
+    return res.json({ ...diagnostics, status: "Supabase client not initialized" });
+  }
+
+  try {
+    // Check menu_items
+    const { error: menuErr } = await supabaseClient.from("menu_items").select("id").limit(1);
+    if (menuErr) {
+      diagnostics.tables.menu_items.error = menuErr.message;
+    } else {
+      diagnostics.tables.menu_items.exists = true;
+    }
+
+    // Check orders
+    const { error: ordersErr } = await supabaseClient.from("orders").select("id").limit(1);
+    if (ordersErr) {
+      diagnostics.tables.orders.error = ordersErr.message;
+    } else {
+      diagnostics.tables.orders.exists = true;
+    }
+
+    // Check order_items
+    const { error: itemsErr } = await supabaseClient.from("order_items").select("id").limit(1);
+    if (itemsErr) {
+      diagnostics.tables.order_items.error = itemsErr.message;
+    } else {
+      diagnostics.tables.order_items.exists = true;
+    }
+  } catch (err: any) {
+    diagnostics.diagnosticError = err.message || err;
+  }
+
+  console.log("Supabase Connection Diagnostics:", JSON.stringify(diagnostics));
+  res.json(diagnostics);
 });
 
 // GET /api/menu - Securely fetches entire menu and handles seeding check on request
@@ -227,7 +271,8 @@ app.post("/api/order", async (req, res) => {
 
     if (orderErr) {
       console.error("Supabase failed inserting order:", orderErr.message);
-      return res.status(500).json({ success: false, error: orderErr.message });
+      const friendlyError = analyzeSupabaseError(orderErr.message);
+      return res.status(500).json({ success: false, error: friendlyError });
     }
 
     if (!insertedOrder) {
@@ -282,6 +327,7 @@ app.post("/api/order", async (req, res) => {
 // --------------------------------------------------------
 async function initializeFrontend() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
