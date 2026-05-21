@@ -306,7 +306,7 @@ export default function MenuBrowsing({
                                         const matchingItem = cart.find(ci => ci.menuItemId === item.id);
                                         if (matchingItem) {
                                           return (
-                                            <div className="bg-slate-100 py-1.5 px-2.5 rounded-xl flex items-center space-x-3.5 border border-slate-200" id={`menu-qty-stepper-${item.id}`}>
+                                            <div className="bg-slate-100 py-1.5 px-2.5 rounded-xl flex items-center space-x-3.5 border border-slate-200 animate-fadeIn" id={`menu-qty-stepper-${item.id}`}>
                                               <button
                                                 onClick={() => onUpdateQuantity(item.id, null, -1)}
                                                 className="text-slate-650 hover:text-black hover:bg-slate-200/85 p-0.5 text-xs font-black w-5 h-5 flex items-center justify-center bg-white border border-slate-200 shadow-xs rounded-md cursor-pointer transition-all active:scale-75"
@@ -318,7 +318,7 @@ export default function MenuBrowsing({
                                               <span className="font-mono text-xs font-black text-slate-800 min-w-[15px] text-center" id={`menu-qty-text-${item.id}`}>{matchingItem.quantity}</span>
                                               <button
                                                 onClick={() => onAddToCart(item, null)}
-                                                className="text-slate-650 hover:text-black hover:bg-slate-200/85 p-0.5 text-xs font-black w-5 h-5 flex items-center justify-center bg-white border border-slate-200 shadow-xs rounded-md cursor-pointer transition-all active:scale-75"
+                                                className="text-slate-650 hover:text-black hover:bg-slate-200/85 p-0.5 text-xs font-black w-5 h-5 flex items-center justify-center bg-white border border-slate-200 shadow-xs rounded-md cursor-pointer transition-all active:scale-75 animate-pulse"
                                                 title="Add"
                                                 id={`menu-increase-${item.id}`}
                                               >

@@ -246,9 +246,14 @@ export default function App() {
   };
 
   const selectedCategoryFeatured = React.useMemo(() => {
-    // Return gorgeous popular suggestions: Briyani (nasi_bri_ayam), Roti canai (roti_kosong), Teh Tarik (tea_susu)
+    // Return gorgeous popular suggestions: Briyani (nasi_bri_ayam), Roti canai (roti_kosong), Teh Tarik (tea_susu) and newly recommended ones
     return dbMenuItems.filter(item => 
-      item.id === 'nasi_bri_ayam' || item.id === 'roti_kosong' || item.id === 'tea_susu'
+      item.id === 'nasi_bri_ayam' || 
+      item.id === 'roti_kosong' || 
+      item.id === 'tea_susu' ||
+      item.id === 'nasi_bri_kambing' ||
+      item.id === 'maggi_gor_telur' ||
+      item.id === 'milo_susu'
     );
   }, [dbMenuItems]);
 

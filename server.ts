@@ -74,62 +74,76 @@ The web application is operating perfectly using robust localized fallback data 
 }
 
 // Resilient backend seeding logic
+let seedPromise: Promise<void> | null = null;
+
 async function seedDatabaseIfEmpty() {
   if (!supabaseClient) {
     console.log("Supabase client is not initialized. Skipping automatic seeding check.");
     return;
   }
 
-  try {
-    const { data: existingItems, error: fetchErr } = await supabaseClient
-      .from("menu_items")
-      .select("id")
-      .limit(1);
+  if (seedPromise) {
+    return seedPromise;
+  }
 
-    if (fetchErr) {
-      console.warn(analyzeSupabaseError(fetchErr.message));
-      return;
-    }
+  seedPromise = (async () => {
+    try {
+      const { data: existingItems, error: fetchErr } = await supabaseClient
+        .from("menu_items")
+        .select("id")
+        .limit(1);
 
-    if (!existingItems || existingItems.length === 0) {
-      console.log("Supabase database menu is empty. Initiating secure backend database seeding...");
-
-      // Map local seed data to client's newer direct schema columns:
-      // ('Nasi Briyani Ayam','makanan','nasi',14.00,FALSE,NULL,NULL,TRUE,1)
-      const itemPayloads = menuItems.map((item, idx) => {
-        let sub = item.subcategoryId;
-        if (sub.startsWith("sub_")) {
-          sub = sub.replace("sub_", "");
-        }
-
-        return {
-          name: item.name,
-          category: item.categoryType,
-          subcategory: sub,
-          base_price: item.basePrice,
-          has_temp_option: item.hasTempOption,
-          price_panas: item.pricePanas !== undefined ? item.pricePanas : null,
-          price_sejuk: item.priceSejuk !== undefined ? item.priceSejuk : null,
-          image_url: item.imageUrl || null,
-          is_available: item.isAvailable,
-          display_order: idx + 1
-        };
-      });
-
-      const chunkSize = 50;
-      for (let i = 0; i < itemPayloads.length; i += chunkSize) {
-        const chunk = itemPayloads.slice(i, i + chunkSize);
-        const { error: itemErr } = await supabaseClient.from("menu_items").insert(chunk);
-        if (itemErr) throw new Error(`MenuItem seeding failed at index ${i}: ${itemErr.message}`);
+      if (fetchErr) {
+        console.warn(analyzeSupabaseError(fetchErr.message));
+        // Reset promise on query failure so a future request can retry
+        seedPromise = null;
+        return;
       }
 
-      console.log(`Database seeding completed successfully. ${itemPayloads.length} items created.`);
-    } else {
-      console.log("Supabase database already contains items. Skipping seeding step.");
+      if (!existingItems || existingItems.length === 0) {
+        console.log("Supabase database menu is empty. Initiating secure backend database seeding...");
+
+        // Map local seed data to client's newer direct schema columns:
+        // ('Nasi Briyani Ayam','makanan','nasi',14.00,FALSE,NULL,NULL,TRUE,1)
+        const itemPayloads = menuItems.map((item, idx) => {
+          let sub = item.subcategoryId;
+          if (sub.startsWith("sub_")) {
+            sub = sub.replace("sub_", "");
+          }
+
+          return {
+            name: item.name,
+            category: item.categoryType,
+            subcategory: sub,
+            base_price: item.basePrice,
+            has_temp_option: item.hasTempOption,
+            price_panas: item.pricePanas !== undefined ? item.pricePanas : null,
+            price_sejuk: item.priceSejuk !== undefined ? item.priceSejuk : null,
+            image_url: item.imageUrl || null,
+            is_available: item.isAvailable,
+            display_order: idx + 1
+          };
+        });
+
+        const chunkSize = 50;
+        for (let i = 0; i < itemPayloads.length; i += chunkSize) {
+          const chunk = itemPayloads.slice(i, i + chunkSize);
+          const { error: itemErr } = await supabaseClient.from("menu_items").insert(chunk);
+          if (itemErr) throw new Error(`MenuItem seeding failed at index ${i}: ${itemErr.message}`);
+        }
+
+        console.log(`Database seeding completed successfully. ${itemPayloads.length} items created.`);
+      } else {
+        console.log("Supabase database already contains items. Skipping seeding step.");
+      }
+    } catch (err: any) {
+      console.error("Seeding operation failed on backend startup:", err.message || err);
+      // Reset promise on failure to force retry on next request
+      seedPromise = null;
     }
-  } catch (err: any) {
-    console.error("Seeding operation failed on backend startup:", err.message || err);
-  }
+  })();
+
+  return seedPromise;
 }
 
 // --------------------------------------------------------
@@ -224,7 +238,7 @@ app.get("/api/menu", async (req, res) => {
       }
 
       return {
-        id: row.id,
+        id: localMatch?.id || row.id,
         subcategoryId: subId,
         categoryType: row.category as CategoryType,
         name: row.name,

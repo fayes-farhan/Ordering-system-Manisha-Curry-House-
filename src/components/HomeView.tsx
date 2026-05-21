@@ -223,19 +223,19 @@ export default function HomeView({
                         const matchingItem = cart.find(ci => ci.menuItemId === item.id);
                         if (matchingItem) {
                           return (
-                            <div className="bg-slate-100 py-1.5 px-2.5 rounded-xl flex items-center space-x-3.5 border border-slate-200" id={`home-featured-qty-stepper-${item.id}`}>
+                            <div className="bg-slate-100 py-1 px-2 rounded-lg flex items-center space-x-2.5 border border-slate-200 animate-fadeIn" id={`home-featured-qty-stepper-${item.id}`}>
                               <button
                                 onClick={() => onUpdateQuantity(item.id, null, -1)}
-                                className="text-slate-650 hover:text-black hover:bg-slate-200/85 p-0.5 text-xs font-black w-5 h-5 flex items-center justify-center bg-white border border-slate-200 shadow-xs rounded-md cursor-pointer transition-all active:scale-75"
+                                className="text-slate-650 hover:text-black hover:bg-slate-200/85 p-0.5 text-[10px] font-black w-4.5 h-4.5 flex items-center justify-center bg-white border border-slate-200 shadow-xs rounded-md cursor-pointer transition-all active:scale-75"
                                 title="Minus"
                                 id={`home-featured-decrease-${item.id}`}
                               >
                                 -
                               </button>
-                              <span className="font-mono text-xs font-black text-slate-800 min-w-[15px] text-center" id={`home-featured-qty-text-${item.id}`}>{matchingItem.quantity}</span>
+                              <span className="font-mono text-[11px] font-black text-slate-800 min-w-[12px] text-center" id={`home-featured-qty-text-${item.id}`}>{matchingItem.quantity}</span>
                               <button
                                 onClick={() => onAddToCartDirectly(item, null)}
-                                className="text-slate-650 hover:text-black hover:bg-slate-200/85 p-0.5 text-xs font-black w-5 h-5 flex items-center justify-center bg-white border border-slate-200 shadow-xs rounded-md cursor-pointer transition-all active:scale-75"
+                                className="text-slate-650 hover:text-black hover:bg-slate-200/85 p-0.5 text-[10px] font-black w-4.5 h-4.5 flex items-center justify-center bg-white border border-slate-200 shadow-xs rounded-md cursor-pointer transition-all active:scale-75 animate-pulse"
                                 title="Add"
                                 id={`home-featured-increase-${item.id}`}
                               >

@@ -112,7 +112,7 @@ export default function CartCheckout({
                 {/* Right Side Adjustment Row */}
                 <div className="flex items-center space-x-3 select-none shrink-0" id={`cart-adjuster-${idx}`}>
                   {/* Quantity adjustment buttons */}
-                  <div className="bg-slate-100/95 py-1.5 px-2.5 rounded-xl flex items-center space-x-3.5 border border-slate-205/60">
+                  <div className="bg-slate-100/95 py-1.5 px-2.5 rounded-xl flex items-center space-x-3.5 border border-slate-200">
                     <button
                       onClick={() => onUpdateQuantity(item.menuItemId, item.selectedTemp, -1)}
                       className="text-slate-600 hover:text-black hover:bg-slate-200/80 p-1 rounded-md transition-all shrink-0 active:scale-80 cursor-pointer"
@@ -121,7 +121,7 @@ export default function CartCheckout({
                     >
                       <Minus size={11} strokeWidth={3} />
                     </button>
-                    <span className="font-mono text-xs font-extrabold text-slate-800" id={`cart-qty-text-${idx}`}>{item.quantity}</span>
+                    <span className="font-mono text-xs font-extrabold text-slate-800 animate-fadeIn" id={`cart-qty-text-${idx}`}>{item.quantity}</span>
                     <button
                       onClick={() => onUpdateQuantity(item.menuItemId, item.selectedTemp, 1)}
                       className="text-slate-600 hover:text-black hover:bg-slate-200/80 p-1 rounded-md transition-all shrink-0 active:scale-80 cursor-pointer"
@@ -140,7 +140,7 @@ export default function CartCheckout({
                   {/* Remove bin button */}
                   <button
                     onClick={() => onRemoveItem(item.menuItemId, item.selectedTemp)}
-                    className="p-1.5 text-red-100 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
                     title="Remove"
                     id={`cart-remove-${idx}`}
                   >
