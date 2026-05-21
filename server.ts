@@ -17,15 +17,25 @@ app.use(express.json());
 
 // Initialize Supabase on the server-side safely
 // The browser will never have access to these credentials
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const rawSupabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+let supabaseUrl = rawSupabaseUrl ? rawSupabaseUrl.trim() : "";
+if (supabaseUrl) {
+  // Clean up any trailing slash and /rest/v1 to prevent duplicate nested pathing with supabase-js
+  supabaseUrl = supabaseUrl.replace(/\/+$/, "");
+  if (supabaseUrl.endsWith("/rest/v1")) {
+    supabaseUrl = supabaseUrl.substring(0, supabaseUrl.length - 8);
+  }
+  supabaseUrl = supabaseUrl.replace(/\/+$/, "");
+}
 
 let supabaseClient: any = null;
 
 if (supabaseUrl && supabaseAnonKey && !supabaseUrl.startsWith("YOUR_") && !supabaseAnonKey.startsWith("YOUR_")) {
   try {
     supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-    console.log("Supabase client successfully initialized on the server.");
+    console.log(`Supabase client successfully initialized on the server. Base URL has been sanitized: [${supabaseUrl}]`);
   } catch (error) {
     console.error("Failed to initialize Supabase client on the server:", error);
   }
