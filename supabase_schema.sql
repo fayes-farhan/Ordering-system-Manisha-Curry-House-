@@ -23,6 +23,7 @@ create table public.menu_items (
     price_panas decimal(10,2),
     price_sejuk decimal(10,2),
     image_url text,
+    description text,
     is_available boolean default true,
     display_order int default 0,
     created_at timestamp with time zone default now()
