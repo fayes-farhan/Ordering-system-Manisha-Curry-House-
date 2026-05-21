@@ -9,7 +9,7 @@ dotenv.config();
 
 // Load the seed data for resilient server-side fallbacks & seeding
 import { categories, subcategories, menuItems } from "./src/data/seedData";
-import { MenuCategory, MenuSubcategory, MenuItem, Order } from "./src/types";
+import { MenuCategory, MenuSubcategory, MenuItem, Order, CategoryType } from "./src/types";
 
 const app = express();
 const PORT = 3000;
@@ -34,6 +34,36 @@ if (supabaseUrl && supabaseAnonKey && !supabaseUrl.startsWith("YOUR_") && !supab
   console.warn("Supabase credentials are not configured or are placeholder values. Operating on local memory fallbacks.");
 }
 
+// Helper function to detect and output helpful setup recommendations for common Supabase challenges
+function analyzeSupabaseError(message: string): string {
+  const msg = String(message || "");
+  if (msg.includes("Invalid path specified in request URL") || msg.includes("relation") || msg.includes("not found")) {
+    return `
+👉 [SUPABASE SETUP NOTICE]
+The core menu tables were not found in your Supabase database.
+To resolve this easily:
+  1. Open your Supabase Dashboard (https://supabase.com)
+  2. Select your project and click "SQL Editor" on the left-hand navigation bar.
+  3. Click "+ New query", then paste the entire SQL definition sequence from 'supabase_schema.sql' (found at the root of this project).
+  4. Click "Run" to automatically instantiate your tables and RLS public policies!
+The web application is operating perfectly using robust localized fallback data until tables are ready.
+`;
+  }
+  if (msg.includes("Forbidden use of secret API key in browser") || msg.includes("JWT") || msg.includes("secret key") || msg.includes("ApiKey")) {
+    return `
+👉 [SUPABASE CREDENTIALS WARNING]
+Supabase rejected the schema query with a 'Forbidden use of secret API key' verification response.
+This error occurs if you configured VITE_SUPABASE_ANON_KEY with your 'service_role' (secret) API key instead of the 'anon' (public) API key.
+To resolve this easily:
+  1. Go to your Supabase Dashboard -> Project Settings -> API.
+  2. Copy the 'anon public' key (NOT the service_role key).
+  3. Update VITE_SUPABASE_ANON_KEY inside your configuration settings with the anon public key.
+The web application is operating perfectly using robust localized fallback data until this is corrected.
+`;
+  }
+  return `Supabase response notice: ${msg}`;
+}
+
 // Resilient backend seeding logic
 async function seedDatabaseIfEmpty() {
   if (!supabaseClient) {
@@ -48,54 +78,39 @@ async function seedDatabaseIfEmpty() {
       .limit(1);
 
     if (fetchErr) {
-      console.warn("Could not query menu_items in Supabase. Tables might not be created. Error:", fetchErr.message);
+      console.warn(analyzeSupabaseError(fetchErr.message));
       return;
     }
 
     if (!existingItems || existingItems.length === 0) {
       console.log("Supabase database menu is empty. Initiating secure backend database seeding...");
 
-      // 1. Seed categories
-      const catPayloads = categories.map(cat => ({
-        id: cat.id,
-        name: cat.name,
-        type: cat.type,
-        icon: cat.icon,
-        order: cat.order
-      }));
-      const { error: catErr } = await supabaseClient.from("menu_categories").upsert(catPayloads);
-      if (catErr) throw new Error(`Category seeding failed: ${catErr.message}`);
+      // Map local seed data to client's newer direct schema columns:
+      // ('Nasi Briyani Ayam','makanan','nasi',14.00,FALSE,NULL,NULL,TRUE,1)
+      const itemPayloads = menuItems.map((item, idx) => {
+        let sub = item.subcategoryId;
+        if (sub.startsWith("sub_")) {
+          sub = sub.replace("sub_", "");
+        }
 
-      // 2. Seed subcategories
-      const subPayloads = subcategories.map(sub => ({
-        id: sub.id,
-        category_id: sub.categoryId,
-        name: sub.name,
-        icon: sub.icon,
-        order: sub.order
-      }));
-      const { error: subErr } = await supabaseClient.from("menu_subcategories").upsert(subPayloads);
-      if (subErr) throw new Error(`Subcategory seeding failed: ${subErr.message}`);
-
-      // 3. Seed menu items in chunks
-      const itemPayloads = menuItems.map(item => ({
-        id: item.id,
-        subcategory_id: item.subcategoryId,
-        category_type: item.categoryType,
-        name: item.name,
-        base_price: item.basePrice,
-        has_temp_option: item.hasTempOption,
-        price_panas: item.pricePanas !== undefined ? item.pricePanas : null,
-        price_sejuk: item.priceSejuk !== undefined ? item.priceSejuk : null,
-        image_url: item.imageUrl,
-        is_available: item.isAvailable,
-        description: item.description || null
-      }));
+        return {
+          name: item.name,
+          category: item.categoryType,
+          subcategory: sub,
+          base_price: item.basePrice,
+          has_temp_option: item.hasTempOption,
+          price_panas: item.pricePanas !== undefined ? item.pricePanas : null,
+          price_sejuk: item.priceSejuk !== undefined ? item.priceSejuk : null,
+          image_url: item.imageUrl || null,
+          is_available: item.isAvailable,
+          display_order: idx + 1
+        };
+      });
 
       const chunkSize = 50;
       for (let i = 0; i < itemPayloads.length; i += chunkSize) {
         const chunk = itemPayloads.slice(i, i + chunkSize);
-        const { error: itemErr } = await supabaseClient.from("menu_items").upsert(chunk);
+        const { error: itemErr } = await supabaseClient.from("menu_items").insert(chunk);
         if (itemErr) throw new Error(`MenuItem seeding failed at index ${i}: ${itemErr.message}`);
       }
 
@@ -128,60 +143,52 @@ app.get("/api/menu", async (req, res) => {
     // Run seed check inline to keep standard UX flow consistent
     await seedDatabaseIfEmpty();
 
-    const [catRes, subRes, itemRes] = await Promise.all([
-      supabaseClient.from("menu_categories").select("*"),
-      supabaseClient.from("menu_subcategories").select("*"),
-      supabaseClient.from("menu_items").select("*")
-    ]);
+    const itemRes = await supabaseClient
+      .from("menu_items")
+      .select("*")
+      .order("display_order", { ascending: true });
 
-    if (catRes.error || subRes.error || itemRes.error) {
-      console.warn("Error querying database tables. Falling back gracefully to seedData.");
+    if (itemRes.error) {
+      console.warn(analyzeSupabaseError(itemRes.error.message));
       return res.json({ categories, subcategories, menuItems });
     }
 
-    if (!catRes.data || catRes.data.length === 0 || !subRes.data || !itemRes.data) {
-      console.warn("Retrieved empty set from database. Serving local seedData instead.");
+    if (!itemRes.data || itemRes.data.length === 0) {
+      console.warn("Retrieved empty set of items from database. Serving local seedData instead.");
       return res.json({ categories, subcategories, menuItems });
     }
 
-    // Map snake_case database rows back to perfect frontend CamelCase types
-    const liveCats: MenuCategory[] = catRes.data.map((row: any) => ({
-      id: row.id,
-      name: row.name,
-      type: row.type,
-      icon: row.icon || "",
-      order: Number(row.order)
-    }));
+    // Map your new custom flat database rows back to CamelCase models expectation
+    const liveItems: MenuItem[] = itemRes.data.map((row: any) => {
+      const localMatch = menuItems.find(
+        (item) => item.name.toLowerCase() === row.name.toLowerCase()
+      );
 
-    const liveSubs: MenuSubcategory[] = subRes.data.map((row: any) => ({
-      id: row.id,
-      categoryId: row.category_id !== undefined ? row.category_id : row.categoryId,
-      name: row.name,
-      icon: row.icon || "",
-      order: Number(row.order)
-    }));
+      let subId = row.subcategory;
+      if (subId && !subId.startsWith("sub_")) {
+        subId = "sub_" + subId;
+      }
 
-    const liveItems: MenuItem[] = itemRes.data.map((row: any) => ({
-      id: row.id,
-      subcategoryId: row.subcategory_id !== undefined ? row.subcategory_id : row.subcategoryId,
-      categoryType: row.category_type !== undefined ? row.category_type : row.categoryType,
-      name: row.name,
-      basePrice: Number(row.base_price !== undefined ? row.base_price : row.basePrice),
-      hasTempOption: Boolean(row.has_temp_option !== undefined ? row.has_temp_option : row.hasTempOption),
-      pricePanas: row.price_panas !== null && row.price_panas !== undefined ? Number(row.price_panas) : undefined,
-      priceSejuk: row.price_sejuk !== null && row.price_sejuk !== undefined ? Number(row.price_sejuk) : undefined,
-      imageUrl: row.image_url !== undefined ? row.image_url : row.imageUrl,
-      isAvailable: Boolean(row.is_available !== undefined ? row.is_available : row.isAvailable),
-      description: row.description || undefined
-    }));
-
-    // Perform sorting identically to seed specifications
-    liveCats.sort((a, b) => a.order - b.order);
-    liveSubs.sort((a, b) => a.order - b.order);
+      return {
+        id: row.id,
+        subcategoryId: subId,
+        categoryType: row.category as CategoryType,
+        name: row.name,
+        basePrice: Number(row.base_price || 0),
+        hasTempOption: Boolean(row.has_temp_option),
+        pricePanas: row.price_panas !== null && row.price_panas !== undefined ? Number(row.price_panas) : undefined,
+        priceSejuk: row.price_sejuk !== null && row.price_sejuk !== undefined ? Number(row.price_sejuk) : undefined,
+        imageUrl: row.image_url || localMatch?.imageUrl || (row.category === "makanan"
+          ? "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80"
+          : "https://images.unsplash.com/photo-1536935338788-846bb9981813?w=600&auto=format&fit=crop&q=80"),
+        isAvailable: Boolean(row.is_available),
+        description: row.description || localMatch?.description || `${row.name} yang lazat.`
+      };
+    });
 
     return res.json({
-      categories: liveCats,
-      subcategories: liveSubs,
+      categories,
+      subcategories,
       menuItems: liveItems
     });
   } catch (error) {
@@ -204,21 +211,62 @@ app.post("/api/order", async (req, res) => {
   }
 
   try {
-    const orderRow = {
-      id: order.id,
-      table_session: order.tableSession,
-      items: order.items,
-      total_amount: order.totalAmount,
-      payment_method: order.paymentMethod,
-      status: order.status,
-      created_at: order.createdAt instanceof Date ? order.createdAt.toISOString() : (order.createdAt || new Date().toISOString())
-    };
+    // 1. Insert Core Order Row
+    const { data: insertedOrder, error: orderErr } = await supabaseClient
+      .from("orders")
+      .insert([{
+        session_id: order.tableSession,
+        total_amount: order.totalAmount,
+        payment_method: order.paymentMethod,
+        status: order.status || "confirmed",
+        order_reference: order.id,
+        created_at: order.createdAt || new Date().toISOString()
+      }])
+      .select()
+      .single();
 
-    const { error } = await supabaseClient.from("orders").insert([orderRow]);
+    if (orderErr) {
+      console.error("Supabase failed inserting order:", orderErr.message);
+      return res.status(500).json({ success: false, error: orderErr.message });
+    }
 
-    if (error) {
-      console.error("Supabase failed inserting order:", error.message);
-      return res.status(500).json({ success: false, error: error.message });
+    if (!insertedOrder) {
+      throw new Error("Unable to obtain confirmation response from orders insert.");
+    }
+
+    // 2. Fetch UUIDs from menu_items to map them correctly as Foreign Keys
+    const { data: dbItems, error: itemsFetchErr } = await supabaseClient
+      .from("menu_items")
+      .select("id, name");
+
+    const itemNameToIdMap = new Map<string, string>();
+    if (dbItems) {
+      dbItems.forEach((it: any) => {
+        itemNameToIdMap.set(it.name.toLowerCase(), it.id);
+      });
+    }
+
+    // 3. Batch insert order items referencing the generated Order UUID
+    const orderItemsPayload = order.items.map((item) => {
+      const dbItemId = itemNameToIdMap.get(item.name.toLowerCase()) || null;
+
+      return {
+        order_id: insertedOrder.id,
+        menu_item_id: dbItemId,
+        item_name: item.name,
+        quantity: item.quantity,
+        selected_temp: item.selectedTemp,
+        unit_price: item.unitPrice,
+        subtotal: item.subtotal
+      };
+    });
+
+    const { error: itemsInsertErr } = await supabaseClient
+      .from("order_items")
+      .insert(orderItemsPayload);
+
+    if (itemsInsertErr) {
+      console.error("Supabase failed inserting order items list:", itemsInsertErr.message);
     }
 
     console.log(`Successfully dispatched order ${order.id} to backend database.`);
