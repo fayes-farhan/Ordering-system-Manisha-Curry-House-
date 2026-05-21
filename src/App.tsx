@@ -6,7 +6,7 @@ import CartCheckout from './components/CartCheckout';
 import Confirmation from './components/Confirmation';
 import BottomCartBar from './components/BottomCartBar';
 import { MenuItem, CartItem, Order, MenuCategory, MenuSubcategory } from './types';
-import { seedDatabaseIfEmpty, fetchLiveMenu, createLiveOrder } from './firebase';
+import { seedDatabaseIfEmpty, fetchLiveMenu, createLiveOrder } from './supabase';
 import { Loader2, MapPin, X, UtensilsCrossed } from 'lucide-react';
 import { Language, t } from './utils/translations';
 
