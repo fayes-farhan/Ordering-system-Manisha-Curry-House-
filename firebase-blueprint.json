@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "MenuCategory": {
+      "title": "Menu Category",
+      "description": "Top-level category, e.g., Makanan or Minuman",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["makanan", "minuman"] },
+        "icon": { "type": "string" },
+        "order": { "type": "integer" }
+      },
+      "required": ["id", "name", "type", "icon", "order"]
+    },
+    "MenuSubcategory": {
+      "title": "Menu Subcategory",
+      "description": "Subcategory under makanan or minuman",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "name": { "type": "string" },
+        "icon": { "type": "string" },
+        "order": { "type": "integer" }
+      },
+      "required": ["id", "categoryId", "name", "icon", "order"]
+    },
+    "MenuItem": {
+      "title": "Menu Item",
+      "description": "A food or drink item on the menu",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "subcategoryId": { "type": "string" },
+        "categoryType": { "type": "string", "enum": ["makanan", "minuman"] },
+        "name": { "type": "string" },
+        "basePrice": { "type": "number" },
+        "hasTempOption": { "type": "boolean" },
+        "pricePanas": { "type": "number" },
+        "priceSejuk": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "isAvailable": { "type": "boolean" }
+      },
+      "required": ["id", "subcategoryId", "categoryType", "name", "basePrice", "hasTempOption", "isAvailable"]
+    },
+    "Order": {
+      "title": "Customer Order",
+      "description": "An order created by the customer, stored in Firestore",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tableSession": { "type": "string" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "qr"] },
+        "status": { "type": "string", "enum": ["pending", "confirmed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tableSession", "items", "totalAmount", "paymentMethod", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/menu_categories/{categoryId}": {
+      "schema": "MenuCategory",
+      "description": "Top-level food/drink categories"
+    },
+    "/menu_subcategories/{subcategoryId}": {
+      "schema": "MenuSubcategory",
+      "description": "Subcategories for food or drink items"
+    },
+    "/menu_items/{itemId}": {
+      "schema": "MenuItem",
+      "description": "The dynamic list of food and drink menu items"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer order confirmations showing table session, nested item quantities, total cost, and payment status"
+    }
+  }
+}

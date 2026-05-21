@@ -1,0 +1,6 @@
+{
+  "name": "Manisha Curry House",
+  "description": "A 24-hour self-service digital QR menu and cashier confirmation system for Manisha Curry House.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
